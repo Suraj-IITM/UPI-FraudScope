@@ -1,0 +1,77 @@
+{
+  "_comment": "This file has the fraud rules and thresholds used by upi_fraudscope.py. Sources are listed for each one (RBI/NPCI/I4C advisories) so they're not just made up. There's no real live database of scam UPI IDs since banks/I4C don't publish that data, so the sample list at the bottom is just a few made-up examples to show how the rule would work.",
+  "_last_updated": "2026-06-20",
+
+  "regulatory_context": {
+    "fraud_growth": {
+      "detail": "Reported cyber-financial fraud cases rose from 2.6 lakh in 2021 to 28 lakh in 2025; reported fraud value rose from Rs 551 crore in 2021 to nearly Rs 22,931 crore in 2025, per RBI's own discussion paper.",
+      "source": "RBI discussion paper on UPI fraud prevention, cited in market reporting, April 2026"
+    },
+    "two_factor_mandate": {
+      "detail": "RBI direction RBI/2025-26/219 mandates two-factor authentication (a dynamic factor like OTP/biometrics plus a knowledge/possession factor) for all digital payment transactions, effective 1 April 2026.",
+      "source": "RBI circular RBI/2025-26/219"
+    },
+    "mule_hunter_ai": {
+      "detail": "RBI has deployed 'MuleHunter.AI', an AI-driven system to identify mule accounts (accounts used to quickly move/launder fraud proceeds), live in 26 banks as of early-mid 2026.",
+      "source": "RBI public statements, cited in financial press, April 2026"
+    },
+    "fraud_risk_indicator": {
+      "detail": "DoT's Financial Fraud Risk Indicator (FRI) classifies mobile numbers into risk tiers (medium/high/very high) based on data from I4C's National Cybercrime Reporting Portal (NCRP), DoT's Chakshu platform, and bank-shared intelligence. RBI advised all scheduled commercial banks to integrate FRI from 30 June 2025.",
+      "source": "RBI advisory dated 30 June 2025; DoT/RBI joint statement"
+    },
+    "qr_and_collect_request_fraud_share": {
+      "detail": "QR code swaps and fake UPI collect requests are estimated to account for roughly 40% of FY26 UPI fraud value (~Rs 805 crore), concentrated at small merchants (street food, fuel stations, small retail).",
+      "source": "Industry fraud-trend reporting citing NCRB/I4C patterns, March 2026"
+    }
+  },
+
+  "scam_categories": [
+    {
+      "name": "Prize / Lottery / KBC scam",
+      "description": "Victim is told they've won a prize/lottery and must pay a 'release fee' or 'tax' via UPI to claim it. Real lotteries/shows never require payment to release winnings.",
+      "typical_keywords": ["prize", "lottery", "winner", "kbc", "lucky draw", "claim reward"],
+      "source": "Widely reported scam pattern; referenced in I4C/CyberDost public advisories"
+    },
+    {
+      "name": "Customs / parcel / FedEx scam",
+      "description": "Victim is told a parcel is held at customs and a fee must be paid via UPI to release it. No legitimate customs process is settled via personal UPI payment.",
+      "typical_keywords": ["customs", "parcel", "fedex", "courier hold", "clearance fee"],
+      "source": "Widely reported scam pattern; referenced in I4C/CyberDost public advisories"
+    },
+    {
+      "name": "Digital arrest / fake law enforcement scam",
+      "description": "Victim is threatened with arrest or legal action (often via video call impersonating police/CBI/customs) and pressured to transfer funds 'for verification'. A genuine, large-scale scam category specifically named in Indian government cyber-fraud advisories.",
+      "typical_keywords": ["digital arrest", "court order", "cbi notice", "verification transfer", "freeze your account"],
+      "source": "I4C/MHA public advisories on 'digital arrest' scams"
+    },
+    {
+      "name": "Screen-sharing / remote-access scam",
+      "description": "A caller posing as bank/UPI customer support persuades the victim to install a remote-access app (AnyDesk, TeamViewer, Quick Support) to 'fix' an issue, then captures OTPs and authorizes transactions directly.",
+      "typical_keywords": ["anydesk", "teamviewer", "quick support", "screen share", "remote access"],
+      "source": "NPCI advisory, March 2026: never install remote access apps at a bank's request"
+    },
+    {
+      "name": "Fake customer-care number scam",
+      "description": "Victim searches for a bank/UPI helpline online, finds an SEO-optimized fake support page, calls a fraudulent number, and is guided into a 'Rs 1 verification payment' that actually authorizes a large debit via a malicious collect request.",
+      "typical_keywords": ["verification payment", "customer care", "helpdesk", "support agent"],
+      "source": "I4C advisory Q2 2026 — reported ~4,200 fake customer-care pages removed from search results"
+    },
+    {
+      "name": "QR code swap / fake collect request",
+      "description": "Fraudster physically swaps a merchant's displayed QR code, or sends a 'collect' request disguised as a 'pay' request, so scanning/approving it actually debits the victim instead of crediting them.",
+      "typical_keywords": ["scan to receive", "collect request", "qr code update"],
+      "source": "RBI circular DPSS.CO.PD 2025-26 advising merchants to physically verify QR codes daily"
+    }
+  ],
+
+  "known_fraud_upi_ids_sample": {
+    "_note": "Illustrative examples only, built from the kinds of keyword patterns documented above (prize/lottery/customs/helpdesk wording commonly seen in scam UPI handles). NOT a real, live crowd-sourced database - no such public database of scam UPI handles exists, for the same reason malware IOC feeds can be public but financial fraud identifiers generally aren't (privacy, rapid rotation, takedown-before-disclosure). Treat this list as a stand-in to demonstrate the rule engine, not as a usable blocklist.",
+    "ids": [
+      "claim.prize@ybl",
+      "kbc.winner@okicici",
+      "lottery.india@paytm",
+      "customs.helpdesk@upi",
+      "digitalrescue@ybl"
+    ]
+  }
+}
