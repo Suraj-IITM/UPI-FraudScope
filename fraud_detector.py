@@ -62,9 +62,7 @@ SCAM_KEYWORDS_UPI = ["prize", "lottery", "winner", "reward", "free", "lucky",
 SCAM_NOTES = ["kbc", "lottery", "prize money", "customs clearance", "digital arrest",
               "fedex", "income tax", "blocking your account", "court order",
               "job registration", "trading profit", "investment"]
-KNOWN_FRAUD_UPIIDS = ["claim.prize@ybl", "kbc.winner@okicici", "lottery.india@paytm",
-                       "customs.helpdesk@upi", "digitalrescue@ybl", "taxrefund@oksbi",
-                       "jobs.registration@paytm", "trading.profit@okaxis"]
+KNOWN_FRAUD_UPIIDS = load_known_fraud_ids()
 
 RULES = {
     "Just Below Reporting Limit (₹48K-50K / ₹98K-1L)":
