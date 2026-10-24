@@ -1,0 +1,10 @@
+{
+  "amount": 500,
+  "recipient_upi": "rahul.sharma@okaxis",
+  "timestamp": "2026-06-14 10:15:00",
+  "payment_note": "Lunch split",
+  "is_new_recipient": false,
+  "new_device": false,
+  "transactions_last_hour": 1,
+  "location_mismatch": false
+}
