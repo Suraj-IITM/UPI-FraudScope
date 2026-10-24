@@ -17,19 +17,43 @@ Why hybrid, not pure ML:
 FINAL_SCORE = w_rules * rule_score + w_ml * ml_probability * 100
 """
 
+import json
+import os
+import threading
+import warnings
+
 import joblib
 import numpy as np
-import pandas as pd
 
-# ── Load trained ML model ──────────────────────────────────────────
+MODEL_PATH = "fraud_model.joblib"
+PATTERNS_PATH = "fraud_patterns.json"
+
+_lock = threading.Lock()
+ML_MODEL = ML_SCALER = ML_FEATURES = ML_NAME = None
+
+
+def load_model(path=MODEL_PATH):
+    """Load (or hot-reload) the trained model. Safe to call while serving."""
+    global ML_MODEL, ML_SCALER, ML_FEATURES, ML_NAME
+    artifact = joblib.load(path)
+    with _lock:
+        ML_MODEL = artifact["model"]
+        ML_SCALER = artifact["scaler"]
+        ML_FEATURES = artifact["features"]
+        ML_NAME = artifact["model_name"]
+    return ML_NAME
+
+
 try:
-    ARTIFACT = joblib.load("fraud_model.joblib")
-    ML_MODEL = ARTIFACT["model"]
-    ML_SCALER = ARTIFACT["scaler"]
-    ML_FEATURES = ARTIFACT["features"]
-    ML_NAME = ARTIFACT["model_name"]
+    load_model()
 except FileNotFoundError:
     raise SystemExit("fraud_model.joblib not found. Run train_model.py first.")
+
+
+def load_known_fraud_ids(path=PATTERNS_PATH):
+    """Single source of truth: fraud_patterns.json (no duplicate hardcoded list)."""
+    with open(path) as f:
+        return set(json.load(f)["known_fraud_upi_ids_sample"]["ids"])
 
 # ── Rule engine (kept from original prototype, still useful for
 #    known/reported fraud UPI IDs and scam keyword matching) ────────
