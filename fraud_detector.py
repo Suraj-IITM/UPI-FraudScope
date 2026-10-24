@@ -97,11 +97,20 @@ def apply_rules(txn: dict):
 
 
 def ml_predict(txn: dict):
-    """txn dict must contain the ML_FEATURES keys."""
-    row = pd.DataFrame([{f: txn.get(f, 0) for f in ML_FEATURES}])
-    X = ML_SCALER.transform(row) if ML_SCALER is not None else row
-    proba = ML_MODEL.predict_proba(X)[0, 1]
-    return float(proba)
+    """txn must contain every feature in ML_FEATURES.
+    Missing features raise an error instead of silently becoming 0 --
+    in a live system a silent 0 would quietly LOWER the fraud score."""
+    with _lock:
+        model, scaler, features = ML_MODEL, ML_SCALER, ML_FEATURES
+    missing = [f for f in features if f not in txn]
+    if missing:
+        raise ValueError(f"Missing ML features: {missing}")
+    X = np.array([[float(txn[f]) for f in features]])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # numpy input vs model fitted on a DataFrame
+        if scaler is not None:
+            X = scaler.transform(X)
+        return float(model.predict_proba(X)[0, 1])
 
 
 def verdict(score):
