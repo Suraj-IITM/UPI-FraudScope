@@ -1,0 +1,13 @@
+{
+  "amount": 49999,
+  "recipient_upi": "claim.prize.kbc.2026@ybl",
+  "timestamp": "2026-06-14 02:30:45",
+  "payment_note": "KBC Lottery Prize Release",
+  "is_new_recipient": true,
+  "new_device": true,
+  "device_name": "Unknown Android Device",
+  "transactions_last_hour": 5,
+  "location_mismatch": true,
+  "home_city": "Delhi",
+  "current_city": "Mumbai"
+}
