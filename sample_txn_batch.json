@@ -1,0 +1,8 @@
+[
+  {"amount": 49999, "recipient_upi": "lottery.winner2026@paytm", "timestamp": "2026-06-14 03:00:00", "is_new_recipient": true, "new_device": true, "location_mismatch": true, "transactions_last_hour": 4, "payment_note": "prize money"},
+  {"amount": 200, "recipient_upi": "mom@okhdfc", "timestamp": "2026-06-14 09:00:00", "is_new_recipient": false, "new_device": false, "location_mismatch": false, "transactions_last_hour": 1, "payment_note": "groceries"},
+  {"amount": 9999, "recipient_upi": "customs.helpdesk@upi", "timestamp": "2026-06-14 14:30:00", "is_new_recipient": true, "new_device": false, "location_mismatch": false, "transactions_last_hour": 2, "payment_note": "customs clearance"},
+  {"amount": 1500, "recipient_upi": "amit.verma@ybl", "timestamp": "2026-06-14 11:00:00", "is_new_recipient": false, "new_device": false, "location_mismatch": false, "transactions_last_hour": 2, "payment_note": "rent"},
+  {"amount": 75000, "recipient_upi": "claim.prize@ybl", "timestamp": "2026-06-14 01:15:00", "is_new_recipient": true, "new_device": true, "location_mismatch": true, "transactions_last_hour": 6, "payment_note": "digital arrest fine"},
+  {"amount": 1, "recipient_upi": "fakebank.support@ybl", "timestamp": "2026-06-14 16:00:00", "is_new_recipient": true, "new_device": false, "location_mismatch": false, "transactions_last_hour": 1, "payment_note": "verification payment for customer care"}
+]
