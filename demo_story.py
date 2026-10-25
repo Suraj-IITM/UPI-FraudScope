@@ -86,7 +86,9 @@ def why(r):
         out.append(f"{f['txns_last_hour']} payments in the last hour")
     if f["hour"] < 6:
         out.append("late-night hour")
-    if f["amount"] >= 40000:
+    if f.get("amount_vs_usual", 1) >= 5:
+        out.append(f"{f['amount_vs_usual']:.0f}x larger than this customer's usual payment")
+    elif f["amount"] >= 40000:
         out.append("large amount")
     out += [RULE_TEXT.get(h, h) for h in r["rule_hits"]]
     return out or ["no warning signs"]
