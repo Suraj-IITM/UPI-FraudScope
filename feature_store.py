@@ -23,6 +23,17 @@ def _text_features(req):
     }
 
 
+MIN_HISTORY = 3  # payments needed before a personal baseline means anything
+
+
+def _ratio(amount, usual, n):
+    """How many times larger this payment is than the sender's usual one.
+    Neutral (1.0) until the sender has a baseline."""
+    if not n or n < MIN_HISTORY or not usual:
+        return 1.0
+    return round(min(float(amount) / usual, 100.0), 3)
+
+
 def _hour_of(ts):
     return time.localtime(ts).tm_hour
 
@@ -36,6 +47,8 @@ class InMemoryFeatureStore:
         self.home = {}                       # sender -> usual location
         self.sender_first_seen = {}
         self.upi_first_seen = {}             # recipient upi -> first timestamp (system-wide)
+        self.amt_sum = defaultdict(float)    # sender -> sum of amounts of accepted payments
+        self.amt_n = defaultdict(int)        # sender -> count of accepted payments
 
     def compute(self, req):
         now = req.get("timestamp") or time.time()
@@ -54,6 +67,9 @@ class InMemoryFeatureStore:
                 sender_age = (now - first) / SECONDS_PER_DAY
             rec_first = self.upi_first_seen.get(r)
             recipient_age = 0.0 if rec_first is None else (now - rec_first) / SECONDS_PER_DAY
+            n_amt = self.amt_n[s]
+            usual = self.amt_sum[s] / n_amt if n_amt else None
+            amount_vs_usual = _ratio(req["amount"], usual, n_amt)
 
         feats = {
             "amount": float(req["amount"]),
@@ -64,6 +80,7 @@ class InMemoryFeatureStore:
             "location_jump": location_jump,
             "recipient_age_days": recipient_age,
             "sender_account_age_days": float(sender_age),
+            "amount_vs_usual": amount_vs_usual,
         }
         feats.update(_text_features(req))
         return feats
@@ -81,6 +98,8 @@ class InMemoryFeatureStore:
             self.sender_first_seen.setdefault(s, now)
             self.upi_first_seen.setdefault(r, now)
             if allow_learning:
+                self.amt_sum[s] += float(req["amount"])
+                self.amt_n[s] += 1
                 self.recipients[s].add(r)
                 if req.get("device_id"):
                     self.devices[s].add(req["device_id"])
@@ -105,7 +124,9 @@ class RedisFeatureStore:
         pipe.get(f"home:{s}")
         pipe.get(f"sender_first:{s}")
         pipe.get(f"upi_first:{rcp}")
-        n_recent, known_rcp, n_dev, dev_known, home, s_first, r_first = pipe.execute()
+        pipe.get(f"amt_sum:{s}")
+        pipe.get(f"amt_n:{s}")
+        n_recent, known_rcp, n_dev, dev_known, home, s_first, r_first, a_sum, a_n = pipe.execute()
 
         sender_age = req.get("sender_account_age_days")
         if sender_age is None:
@@ -119,6 +140,7 @@ class RedisFeatureStore:
             "location_jump": int(home is not None and req.get("location") not in (None, home)),
             "recipient_age_days": (now - float(r_first)) / SECONDS_PER_DAY if r_first else 0.0,
             "sender_account_age_days": float(sender_age),
+            "amount_vs_usual": _ratio(req["amount"], (float(a_sum) / int(a_n)) if a_n else None, int(a_n or 0)),
         }
         feats.update(_text_features(req))
         return feats
@@ -133,6 +155,8 @@ class RedisFeatureStore:
         pipe.setnx(f"sender_first:{s}", now)
         pipe.setnx(f"upi_first:{rcp}", now)
         if allow_learning:
+            pipe.incrbyfloat(f"amt_sum:{s}", float(req["amount"]))
+            pipe.incr(f"amt_n:{s}")
             pipe.sadd(f"recipients:{s}", rcp)
             if req.get("device_id"):
                 pipe.sadd(f"devices:{s}", req["device_id"])
