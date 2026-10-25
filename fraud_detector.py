@@ -58,10 +58,13 @@ def load_known_fraud_ids(path=PATTERNS_PATH):
 # ── Rule engine (kept from original prototype, still useful for
 #    known/reported fraud UPI IDs and scam keyword matching) ────────
 SCAM_KEYWORDS_UPI = ["prize", "lottery", "winner", "reward", "free", "lucky",
-                      "claim", "customs", "rescue", "helpdesk", "support", "refund", "kbc"]
-SCAM_NOTES = ["kbc", "lottery", "prize money", "customs clearance", "digital arrest",
+                      "claim", "customs", "rescue", "helpdesk", "support", "refund", "kbc",
+                      "hrdesk", "recruit", "fedex", "parcel"]
+SCAM_NOTES = ["kbc", "lottery", "prize", "customs clearance", "digital arrest",
               "fedex", "income tax", "blocking your account", "court order",
-              "job registration", "trading profit", "investment"]
+              "job registration", "registration fee", "processing fee",
+              "clearance fee", "verification payment", "trading profit",
+              "investment"]
 KNOWN_FRAUD_UPIIDS = load_known_fraud_ids()
 
 RULES = {
@@ -125,7 +128,7 @@ def verdict(score):
 
 def analyze_transaction(txn: dict):
     """
-    txn: dict with keys — amount, hour, is_new_recipient, is_new_device,
+    txn: dict with keys — amount, amount_vs_usual, hour, is_new_recipient, is_new_device,
     txns_last_hour, location_jump, recipient_age_days,
     sender_account_age_days, contains_urgency_words,
     upi_id_suspicious_keyword, is_known_fraud_upi_db,
@@ -136,10 +139,20 @@ def analyze_transaction(txn: dict):
     ml_score = ml_proba * 100
 
     final_score = round(W_RULES * rule_score + W_ML * ml_score, 1)
+    # Corroboration floor: two independent scam rules firing together (e.g. a
+    # scam-style ID AND a scam-style note) is strong evidence even when the
+    # amount is tiny and the model is unsure -- never let it pass as SAFE.
+    if len(rule_hits) >= 2:
+        final_score = max(final_score, 45.0)
     # Hard override: a UPI ID already confirmed fraudulent always blocks,
     # regardless of what the model says.
     if txn.get("upi", "") in KNOWN_FRAUD_UPIIDS:
         final_score = 100.0
+
+    # Step-up policy: a high-value payment to someone never paid before is not
+    # a scam by itself, but it should never pass without at least an extra check.
+    if txn.get("amount", 0) >= 50000 and txn.get("is_new_recipient"):
+        final_score = max(final_score, 20.0)
 
     label, action = verdict(final_score)
 
@@ -158,6 +171,7 @@ def analyze_transaction(txn: dict):
 DEMO_TXNS = {
     "KBC Lottery Scam": {
         "amount": 49999, "hour": 14, "is_new_recipient": 1, "is_new_device": 0,
+        "amount_vs_usual": 8,
         "txns_last_hour": 1, "location_jump": 0, "recipient_age_days": 2,
         "sender_account_age_days": 900, "contains_urgency_words": 1,
         "upi_id_suspicious_keyword": 1, "is_known_fraud_upi_db": 0,
@@ -165,6 +179,7 @@ DEMO_TXNS = {
     },
     "FedEx / Customs Scam": {
         "amount": 85000, "hour": 15, "is_new_recipient": 1, "is_new_device": 1,
+        "amount_vs_usual": 20,
         "txns_last_hour": 2, "location_jump": 0, "recipient_age_days": 1,
         "sender_account_age_days": 500, "contains_urgency_words": 1,
         "upi_id_suspicious_keyword": 1, "is_known_fraud_upi_db": 1,
@@ -172,6 +187,7 @@ DEMO_TXNS = {
     },
     "Digital Arrest Scam": {
         "amount": 99500, "hour": 3, "is_new_recipient": 1, "is_new_device": 0,
+        "amount_vs_usual": 40,
         "txns_last_hour": 5, "location_jump": 0, "recipient_age_days": 1,
         "sender_account_age_days": 1200, "contains_urgency_words": 1,
         "upi_id_suspicious_keyword": 0, "is_known_fraud_upi_db": 1,
@@ -179,6 +195,7 @@ DEMO_TXNS = {
     },
     "Fake Job Offer Scam": {
         "amount": 2999, "hour": 11, "is_new_recipient": 1, "is_new_device": 0,
+        "amount_vs_usual": 15,
         "txns_last_hour": 1, "location_jump": 0, "recipient_age_days": 5,
         "sender_account_age_days": 200, "contains_urgency_words": 1,
         "upi_id_suspicious_keyword": 0, "is_known_fraud_upi_db": 1,
@@ -186,6 +203,7 @@ DEMO_TXNS = {
     },
     "Investment / Trading Scam": {
         "amount": 15000, "hour": 13, "is_new_recipient": 1, "is_new_device": 0,
+        "amount_vs_usual": 6,
         "txns_last_hour": 1, "location_jump": 0, "recipient_age_days": 10,
         "sender_account_age_days": 700, "contains_urgency_words": 0,
         "upi_id_suspicious_keyword": 0, "is_known_fraud_upi_db": 1,
@@ -193,6 +211,7 @@ DEMO_TXNS = {
     },
     "Stolen Phone Account Takeover": {
         "amount": 49800, "hour": 1, "is_new_recipient": 1, "is_new_device": 1,
+        "amount_vs_usual": 12,
         "txns_last_hour": 7, "location_jump": 1, "recipient_age_days": 30,
         "sender_account_age_days": 800, "contains_urgency_words": 0,
         "upi_id_suspicious_keyword": 0, "is_known_fraud_upi_db": 0,
@@ -200,6 +219,7 @@ DEMO_TXNS = {
     },
     "Legitimate Rent Payment (control)": {
         "amount": 8000, "hour": 10, "is_new_recipient": 0, "is_new_device": 0,
+        "amount_vs_usual": 1,
         "txns_last_hour": 1, "location_jump": 0, "recipient_age_days": 400,
         "sender_account_age_days": 1500, "contains_urgency_words": 0,
         "upi_id_suspicious_keyword": 0, "is_known_fraud_upi_db": 0,
