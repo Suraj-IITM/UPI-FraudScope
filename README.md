@@ -45,20 +45,26 @@ selects the best model by **PR-AUC** — not accuracy, since accuracy is
 misleading when ~94% of transactions are legitimate. It also prints a
 confusion matrix and feature importances for the winning model.
 
-**Last run: Gradient Boosting won, PR-AUC = 0.9916** (ROC-AUC 0.9995,
-fraud-class precision 0.956 / recall 0.943 on a held-out test set).
+**Last run: Gradient Boosting won, PR-AUC = 0.9583** (ROC-AUC 0.9968,
+fraud-class precision 0.904 / recall 0.850 on a held-out test set).
 
-*Caveat worth stating up front: `amount` alone drives ~82% of the
-model's decisions. That likely reflects the synthetic data generator
-making fraud/legit amounts fall in fairly distinct ranges — real
-transactions would probably be noisier. The obvious next step, given
-access to real or anonymized data, would be to check whether this
-separation holds up.*
+*How the data was made realistic:* an earlier version of the generator let
+`amount` alone drive ~82% of the model's decisions, because fraud and legitimate
+amounts barely overlapped, and it treated every never-seen recipient as fraud.
+The generator now includes big-ticket legitimate payments (deposits, electronics,
+tuition) and legitimate first-time recipients, and adds a personal-baseline
+feature, `amount_vs_usual` (this payment divided by the sender's own average).
+`amount` now carries ~19% of the importance. This is what lets the system catch a
+Rs 98,500 "digital arrest" transfer from a customer who normally pays Rs 1-3k,
+while a planned Rs 75,000 bike purchase is only asked for an extra check.
+The data is still synthetic, so these numbers show the method, not real-world accuracy.
 
 `fraud_detector.py` then combines the trained model's fraud probability
 (65% weight) with the rule engine's flags (35% weight) into a final
-score, with one hard override: a UPI ID already confirmed fraudulent
-always blocks regardless of the model's score.
+score, with three overrides: a UPI ID already confirmed fraudulent always
+blocks; two independent scam rules firing together (e.g. scam-style ID plus
+scam-style note) never score below WARN, even for tiny amounts; and a payment
+of Rs 50,000 or more to a first-time recipient always gets at least an extra check.
 
 ## Real-time API
 
@@ -86,7 +92,7 @@ Example response (shortened):
 
 How a payment is scored:
 1. `app.py` receives the raw payment (sender, recipient, amount, note, device, location).
-2. `feature_store.py` builds the 11 model features from the sender's history
+2. `feature_store.py` builds the 12 model features from the sender's history
    (payments in the last hour, new recipient, new device, location change, etc.).
 3. `fraud_detector.py` combines the rule score (35%) and model probability (65%).
 4. The API returns SAFE / CAUTION / WARN / BLOCK with the reasons, then updates the history.
@@ -122,6 +128,7 @@ Re-measure on your own hardware.
 | `feature_store.py` | builds model features from user history (in-memory or Redis) |
 | `retrain.py` | scheduled retraining from logged payments + confirmed fraud labels |
 | `simulate.py` | sends test payments to the API and measures latency |
+| `demo_story.py` | four realistic stories (normal day, digital arrest, stolen phone, fake job) plus a type-your-own mode; starts its own API |
 | `upi_fraudscope.py` | standalone rule-only detector (no ML dependency, fully interpretable) |
 | `fraud_patterns.json` | cited regulatory context + scam categories + sample fraud-ID list |
 | `requirements.txt` | dependencies |
