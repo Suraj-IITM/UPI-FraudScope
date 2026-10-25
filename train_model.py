@@ -36,6 +36,7 @@ FEATURES = [
     "txns_last_hour", "location_jump", "recipient_age_days",
     "sender_account_age_days", "contains_urgency_words",
     "upi_id_suspicious_keyword", "is_known_fraud_upi_db",
+    "amount_vs_usual",
 ]
 TARGET = "label"
 
