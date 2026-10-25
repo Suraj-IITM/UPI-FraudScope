@@ -40,23 +40,42 @@ CITIES = ["Delhi", "Mumbai", "Bangalore", "Chennai", "Pune",
 
 def gen_legit(n):
     """Legitimate transactions: rent, groceries, friends, bills, shopping.
-    Includes some 'hard' cases that resemble fraud signals (new online
-    seller, first-time bill payment, occasional late-night order) so the
-    classes are NOT trivially separable -- this mirrors real-world overlap
-    between genuine and fraudulent behaviour."""
+    Deliberately OVERLAPS with fraud so no single column separates the classes:
+      - ~15% are big-ticket payments (deposits, electronics, tuition, gifts)
+        up to the Rs 1 lakh UPI limit, often to a recipient paid for the first time
+      - ~40% of first-time recipients are also brand new to the platform
+        (age ~0 days), exactly like a scam ID -- so 'new recipient' and
+        'young recipient' alone are NOT proof of fraud."""
+    big = RNG.random(n) < 0.15
+    small_amt = RNG.lognormal(mean=6.5, sigma=1.1, size=n).clip(10, 90000)
+    big_amt = RNG.uniform(10000, 100000, size=n)
+    amount = np.round(np.where(big, big_amt, small_amt), 2)
+
+    p_new = np.where(big, 0.40, 0.20)
+    is_new = (RNG.random(n) < p_new).astype(int)
+    fresh_id = (RNG.random(n) < 0.40) & (is_new == 1)      # new to the platform too
+    rec_age = np.where(fresh_id,
+                       RNG.exponential(scale=4, size=n).clip(0, 30),
+                       RNG.exponential(scale=200, size=n).clip(0.5, 3000))
+
+    # amount relative to the sender's own usual payment (1.0 = typical). Everyday
+    # payments sit near 1; planned big-ticket ones are several times larger.
+    ratio = np.where(big, RNG.lognormal(1.3, 0.8, n), RNG.lognormal(0.0, 0.7, n)).clip(0.05, 60)
+    ratio = np.where(RNG.random(n) < 0.05, 1.0, ratio)   # no baseline yet -> neutral
+
     df = pd.DataFrame({
-        "amount": np.round(RNG.lognormal(mean=6.5, sigma=1.1, size=n), 2).clip(10, 90000),
-        "hour": RNG.choice(range(24), size=n,
-                            p=_hour_profile(peak=(9, 21))),
-        "is_new_recipient": RNG.choice([0, 1], size=n, p=[0.78, 0.22]),
+        "amount": amount,
+        "hour": RNG.choice(range(24), size=n, p=_hour_profile(peak=(9, 21))),
+        "is_new_recipient": is_new,
         "is_new_device": RNG.choice([0, 1], size=n, p=[0.93, 0.07]),
-        "txns_last_hour": RNG.poisson(1.0, size=n).clip(0, 6),
+        "txns_last_hour": RNG.poisson(1.0, size=n).clip(0, 6) + 1,
         "location_jump": RNG.choice([0, 1], size=n, p=[0.95, 0.05]),
-        "recipient_age_days": RNG.exponential(scale=200, size=n).clip(0.5, 3000),
+        "recipient_age_days": rec_age,
         "sender_account_age_days": RNG.uniform(30, 3000, size=n),
         "contains_urgency_words": RNG.choice([0, 1], size=n, p=[0.92, 0.08]),
         "upi_id_suspicious_keyword": RNG.choice([0, 1], size=n, p=[0.94, 0.06]),
         "is_known_fraud_upi_db": np.zeros(n, dtype=int),
+        "amount_vs_usual": np.round(ratio, 3),
         "label": np.zeros(n, dtype=int),
         "fraud_type": ["none"] * n,
     })
@@ -73,36 +92,39 @@ def gen_fraud(n):
         # so a meaningful fraction of fraud rows carry NO obvious flag.
         # This keeps the classification task realistic instead of trivial.
         if t == "lottery_prize":
-            amount = RNG.uniform(15000, 50000)
+            amount = RNG.uniform(2000, 50000)
             hour = RNG.choice(range(9, 22))
             urgency, kw, fraud_db = RNG.choice([0, 1], p=[0.35, 0.65]), RNG.choice([0, 1], p=[0.55, 0.45]), RNG.choice([0, 1], p=[0.75, 0.25])
             new_dev, loc_jump, freq = 0, 0, RNG.integers(1, 3)
         elif t == "customs_fine":
-            amount = RNG.uniform(30000, 100000)
+            amount = RNG.uniform(3000, 100000)
             hour = RNG.choice(range(10, 20))
             urgency, kw, fraud_db = RNG.choice([0, 1], p=[0.3, 0.7]), RNG.choice([0, 1], p=[0.55, 0.45]), RNG.choice([0, 1], p=[0.7, 0.3])
             new_dev, loc_jump, freq = RNG.choice([0, 1], p=[0.7, 0.3]), 0, RNG.integers(1, 4)
         elif t == "digital_arrest":
-            amount = RNG.uniform(40000, 150000)
+            amount = RNG.uniform(5000, 100000)
             hour = RNG.choice(range(0, 24))
             urgency, kw, fraud_db = RNG.choice([0, 1], p=[0.35, 0.65]), RNG.choice([0, 1], p=[0.6, 0.4]), RNG.choice([0, 1], p=[0.75, 0.25])
             new_dev, loc_jump, freq = RNG.choice([0, 1], p=[0.6, 0.4]), 0, RNG.integers(2, 7)
         elif t == "fake_job":
-            amount = RNG.uniform(1000, 7000)
+            amount = RNG.uniform(500, 8000)
             hour = RNG.choice(range(9, 22))
             urgency, kw, fraud_db = RNG.choice([0, 1], p=[0.4, 0.6]), RNG.choice([0, 1], p=[0.6, 0.4]), RNG.choice([0, 1], p=[0.8, 0.2])
             new_dev, loc_jump, freq = 0, 0, RNG.integers(1, 3)
         elif t == "investment_scam":
-            amount = RNG.uniform(4000, 40000)
+            amount = RNG.uniform(1000, 60000)
             hour = RNG.choice(range(9, 23))
             urgency, kw, fraud_db = RNG.choice([0, 1], p=[0.5, 0.5]), RNG.choice([0, 1], p=[0.6, 0.4]), RNG.choice([0, 1], p=[0.75, 0.25])
             new_dev, loc_jump, freq = 0, 0, RNG.integers(1, 3)
         else:  # account_takeover -- deliberately the hardest class: no keywords/urgency at all
-            amount = RNG.uniform(8000, 50000)
+            amount = RNG.uniform(2000, 60000)
             hour = RNG.choice(range(0, 6))
             urgency, kw, fraud_db = 0, 0, RNG.choice([0, 1], p=[0.8, 0.2])
-            new_dev, loc_jump, freq = RNG.choice([0, 1], p=[0.2, 0.8]), RNG.choice([0, 1], p=[0.3, 0.7]), RNG.integers(2, 10)
+            new_dev, loc_jump, freq = RNG.choice([0, 1], p=[0.2, 0.8]), RNG.choice([0, 1], p=[0.3, 0.7]), RNG.integers(1, 10)
 
+        mu, sg = {"lottery_prize": (1.6, 0.9), "customs_fine": (2.2, 0.9), "digital_arrest": (3.0, 0.8),
+                  "fake_job": (1.3, 0.9), "investment_scam": (1.5, 0.9), "account_takeover": (1.8, 0.8)}[t]
+        ratio = 1.0 if RNG.random() < 0.05 else float(np.clip(RNG.lognormal(mu, sg), 0.05, 100))
         rows.append({
             "amount": round(amount, 2),
             "hour": hour,
@@ -115,6 +137,7 @@ def gen_fraud(n):
             "contains_urgency_words": urgency,
             "upi_id_suspicious_keyword": kw,
             "is_known_fraud_upi_db": fraud_db,
+            "amount_vs_usual": round(ratio, 3),
             "label": 1,
             "fraud_type": t,
         })
@@ -139,7 +162,7 @@ def main():
               "txns_last_hour", "location_jump", "recipient_age_days",
               "sender_account_age_days", "contains_urgency_words",
               "upi_id_suspicious_keyword", "is_known_fraud_upi_db",
-              "fraud_type", "label"]]
+              "amount_vs_usual", "fraud_type", "label"]]
     df.to_csv("upi_transactions.csv", index=False)
     print(f"Generated {len(df)} transactions -> upi_transactions.csv")
     print(f"Fraud rate: {df['label'].mean():.2%}")
